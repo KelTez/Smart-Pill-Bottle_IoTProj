@@ -1,4 +1,3 @@
-
 /*
 * JUST A SIMPLE HELLO_WORLD APP, FOR EASE OF FLUTTER FUNCTIONALITY. TO BUILD OFF OF THIS BASE
 */
@@ -6,6 +5,69 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
+void main() {
+  runApp(MaterialApp(
+    title: 'Smart Pill App',
+    home: MainPage(),
+  ));
+}
+
+class MainPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Adherence & Alarm'),
+      ),
+      body: Center(
+        child: new Column(
+
+          children: <Widget>[
+
+            new RaisedButton(
+              child: Text('Configurations'),
+              onPressed: () {
+                // Navigate to configuration when tapped.
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ConfigPage()),
+                );
+              },
+            ),
+            new Text('For this page, have the manual override button, manual increase of consumption, automatic consumption values (added by app), time last consumed pill, and more?'),
+            new RaisedButton(
+                child: Text('Manual Overide Pill Release'),
+                color: Color.fromRGBO(55, 65, 75, 1),
+                onPressed: null, //TODO SOMETHING, TO ADD FUNCTIONALITY
+            ),
+
+
+          ],
+        )
+      ),
+    );
+  }
+}
+
+class ConfigPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Configuration"),
+      ),
+      body: Center(
+        child: Text('Add config options. Such options include pill dosage, time intervals'),
+      ),
+    );
+  }
+}
+
+
+
+
+
+/* EXAMPLE BELOW IS SIMPLE HELLO WORLD, TO HELP YOU UNDERSTAND HOW STUFF WORKS. UNCOMMENT IT, AND COMMENT MAIN TO SEE
 // Use arrow notation for one-line functions or methods
 void main() => runApp(MyApp());
 
@@ -31,3 +93,4 @@ class MyApp extends StatelessWidget { //
   }
 
 }
+*/
