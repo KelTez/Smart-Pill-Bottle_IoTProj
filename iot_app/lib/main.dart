@@ -2,8 +2,10 @@
 * JUST A SIMPLE HELLO_WORLD APP, FOR EASE OF FLUTTER FUNCTIONALITY. TO BUILD OFF OF THIS BASE
 */
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
+import 'Widgets.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -13,16 +15,26 @@ void main() {
 }
 
 class MainPage extends StatelessWidget {
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Adherence & Alarm'),
       ),
-      body: Center(
-        child: new Column(
+
+      body: ListView(
 
           children: <Widget>[
+
+            Titles.adherence,
+            Boxes.consumedBox,
+            Boxes.overrideBox,
+            Boxes.releasedBox,
+            Titles.alarm,
+            Boxes.lastConsumedBox,
+            Boxes.lastReleasedBox,
+            Boxes.alarmBox,
 
             new RaisedButton(
               child: Text('Configurations'),
@@ -34,16 +46,13 @@ class MainPage extends StatelessWidget {
                 );
               },
             ),
-            new Text('For this page, have the manual override button, manual increase of consumption, automatic consumption values (added by app), time last consumed pill, and more?'),
             new RaisedButton(
-                child: Text('Manual Overide Pill Release'),
-                color: Color.fromRGBO(55, 65, 75, 1),
-                onPressed: null, //TODO SOMETHING, TO ADD FUNCTIONALITY
+              child: Text('Manual Overide Pill Release'),
+              color: Color.fromRGBO(55, 65, 75, 1),
+              onPressed: null, //TODO SOMETHING, TO ADD FUNCTIONALITY
             ),
-
-
           ],
-        )
+
       ),
     );
   }
