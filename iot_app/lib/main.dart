@@ -1,7 +1,6 @@
 /*
 * JUST A SIMPLE HELLO_WORLD APP, FOR EASE OF FLUTTER FUNCTIONALITY. TO BUILD OFF OF THIS BASE
 */
-
 import 'dart:isolate';
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
@@ -32,9 +31,9 @@ void testAlarm() {
 
 class BLEScanPage extends StatefulWidget {
   BLEScanPage({Key key, this.title}) : super(key: key);
-  int carryOn = 1; //used to see whether the user can carryOn from bluetooth page
+  int carryOn = 0; //used to see whether the user can carryOn from bluetooth page
   final String title;
-  final String TARGET_DEVICE_NAME = 'our device name'; //used for check?
+  final String TARGET_DEVICE_NAME = 'PILL_BOTTLE'; //used for check?
   final FlutterBlue flutterBlue = FlutterBlue.instance;
   final List<BluetoothDevice> devicesList = new List<BluetoothDevice>(); //WONDERING IF WE NEED TO DISPLAY A LIST, IF PHONE CONNECTED TO DEVICE
 
@@ -44,6 +43,11 @@ class BLEScanPage extends StatefulWidget {
 }
 
 class _BLEPageState extends State<BLEScanPage>{
+
+  final _writeController = TextEditingController();
+  BluetoothDevice _connectedDevice;
+  List<BluetoothService> _services;
+
   _addDeviceTolist(final BluetoothDevice device) {
     if (!widget.devicesList.contains(device)) {
       setState(() {
@@ -51,7 +55,7 @@ class _BLEPageState extends State<BLEScanPage>{
       });
     }
   }
-  //will need a check or something, and a button that says (proceed). The button only proceeds user if the actual pill is selected
+
   @override
 
   void initState() {
@@ -70,12 +74,9 @@ class _BLEPageState extends State<BLEScanPage>{
     widget.flutterBlue.startScan();
   }
 
-  ListView _buildListViewOfDevices() {
+  ListView _buildListViewOfDevices() { //builds listview of devices
     List<Container> containers = new List<Container>();
     for (BluetoothDevice device in widget.devicesList) {
-      if(device.name == widget.TARGET_DEVICE_NAME){
-        widget.carryOn = 1; //MOVE THIS SOMEWHERE ELSE, NEED A CHECK FOR WHEN USER ADDS THE DEVICE FOR CONNECTION
-      }
       containers.add(
         Container(
           height: 50,
@@ -95,7 +96,68 @@ class _BLEPageState extends State<BLEScanPage>{
                   'Connect',
                   style: TextStyle(color: Colors.white),
                 ),
-                onPressed: () {}, //when device name is whatever, change the state to 1
+                onPressed: () {
+                  if(device.name == widget.TARGET_DEVICE_NAME){
+                    widget.carryOn = 1;
+                  }
+                  setState(() async {
+                    widget.flutterBlue.stopScan();
+                    try {
+                      await device.connect();
+                    } catch (e) {
+                      if (e.code != 'already_connected') {
+                        throw e;
+                      }
+                    } finally {
+                      _services = await device.discoverServices();
+                    }
+                    _connectedDevice = device;
+                  });
+                }, //when device name is whatever, change the state to 1
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView( //listview of devices that we can connect to
+      padding: const EdgeInsets.all(8),
+
+      children: <Widget>[
+        ...containers,
+        Container(),
+        new FlatButton(
+            color: Colors.blueAccent,
+            child: Text('Main Page', style:TextStyle(color: Colors.white)),
+            onPressed: (){
+              if(widget.carryOn == 1){
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MainPage()),
+                );
+                return Future.value(false); //to be tested
+              }
+              return Alert(context: context, title: 'Dispenser not connected').show();
+            }
+        ),
+      ],
+    );
+  }
+  ListView _buildConnectDeviceView() {
+    List<Container> containers = new List<Container>();
+    for (BluetoothService service in _services) {
+      containers.add(
+        Container(
+          height: 50,
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  children: <Widget>[
+                    Text(service.uuid.toString()),
+                  ],
+                ),
               ),
             ],
           ),
@@ -107,38 +169,32 @@ class _BLEPageState extends State<BLEScanPage>{
       padding: const EdgeInsets.all(8),
       children: <Widget>[
         ...containers,
-        new FlatButton(
-            child:Text('Main Page'),
-            onPressed: (){
-              if(widget.carryOn == 1){
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => MainPage()),
-
-                );
-                return Future.value(false); //to be tested
-              }else{
-                // ignore: missing_return
-                return Alert(context: context, title: 'Dispenser not connected').show();
-              }
-            }
-        ),
       ],
     );
   }
 
+  ListView _buildView() { //creates connected devices view
+    if (_connectedDevice != null) {
+      return _buildConnectDeviceView();
+    }
+    return _buildListViewOfDevices();
+  }
+
+@override
  build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(widget.title),
     ),
-    body: Column(
-      children: <Widget>[],
-    ),
+    body: _buildView(),
   );
 
 }
 
-class MainPage extends StatelessWidget {
+/*
+* MAIN PAGE
+*/
+
+class MainPage extends StatelessWidget { //MIGHT HAVE THIS EXTAND A WIDGET CLASS OR SOMETHINEG
 
   Widget build(BuildContext context) {
     return Scaffold(

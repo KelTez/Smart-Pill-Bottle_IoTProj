@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+//only includes widgets that dont depend on other pages
 
 class Titles{
 
@@ -258,5 +259,9 @@ class Boxes{
     ],
   );
 }
+
+
+
+
 
 
