@@ -2,16 +2,31 @@
 * JUST A SIMPLE HELLO_WORLD APP, FOR EASE OF FLUTTER FUNCTIONALITY. TO BUILD OFF OF THIS BASE
 */
 
+import 'dart:isolate';
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
+import 'package:android_alarm_manager/android_alarm_manager.dart';
 import 'Widgets.dart';
 
-void main() {
+// TODO: Add push notification and sound alert when this occurs
+void testAlarm() {
+  final DateTime now = DateTime.now();
+  final int isolateId = Isolate.current.hashCode;
+  print("[$now] Hello, world! isolate=${isolateId} function='$testAlarm'");
+}
+
+void main() async {
+  final int alarmID = 0;
+  bool init;
+  WidgetsFlutterBinding.ensureInitialized();
+  await AndroidAlarmManager.initialize();
   runApp(MaterialApp(
     title: 'Smart Pill App',
     home: MainPage(),
   ));
+  await AndroidAlarmManager.periodic(const Duration(seconds: 10), alarmID, testAlarm);
 }
 
 class MainPage extends StatelessWidget {
