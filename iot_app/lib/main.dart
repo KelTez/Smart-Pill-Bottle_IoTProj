@@ -10,6 +10,7 @@ import 'package:flutter_blue/flutter_blue.dart';
 import 'package:android_alarm_manager/android_alarm_manager.dart';
 import 'Widgets.dart';
 
+
 // TODO: Add push notification and sound alert when this occurs
 void testAlarm() {
   final DateTime now = DateTime.now();
@@ -23,15 +24,47 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AndroidAlarmManager.initialize();
   runApp(MaterialApp(
-    title: 'Smart Pill App',
-    home: MainPage(),
+    title: 'BLEScanPage',
+    home: BLEScanPage(title: 'Bluetooth Scan'),
   ));
   await AndroidAlarmManager.periodic(const Duration(seconds: 10), alarmID, testAlarm);
 }
 
-class MainPage extends StatelessWidget {
+class BLEScanPage extends StatefulWidget {
+  BLEScanPage({Key key, this.title}) : super(key: key);
+
+  final String title;
+  final String TARGET_DEVICE_NAME = 'our device name'; //used for check?
+  final FlutterBlue flutterBlue = FlutterBlue.instance;
+  final List<BluetoothDevice> devicesList = new List<BluetoothDevice>(); //WONDERING IF WE NEED TO DISPLAY A LIST, IF PHONE CONNECTED TO DEVICE
 
   @override
+  _BLEPageState createState() => _BLEPageState();
+
+}
+
+class _BLEPageState extends State<BLEScanPage>{
+  _addDeviceTolist(final BluetoothDevice device) {
+    if (!widget.devicesList.contains(device)) {
+      setState(() {
+        widget.devicesList.add(device);
+      });
+    }
+  }
+  //will need a check or something, and a button that says (proceed). The button only proceeds user if the actual pill is selected
+  @override
+ build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(widget.title),
+    ),
+    body: Column(
+      children: <Widget>[],
+    ),
+  );
+}
+
+class MainPage extends StatelessWidget {
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -40,38 +73,39 @@ class MainPage extends StatelessWidget {
 
       body: ListView(
 
-          children: <Widget>[
+        children: <Widget>[
 
-            Titles.adherence,
-            Boxes.consumedBox,
-            Boxes.overrideBox,
-            Boxes.releasedBox,
-            Titles.alarm,
-            Boxes.lastConsumedBox,
-            Boxes.lastReleasedBox,
-            Boxes.alarmBox,
+          Titles.adherence,
+          Boxes.consumedBox,
+          Boxes.overrideBox,
+          Boxes.releasedBox,
+          Titles.alarm,
+          Boxes.lastConsumedBox,
+          Boxes.lastReleasedBox,
+          Boxes.alarmBox,
 
-            new RaisedButton(
-              child: Text('Configurations'),
-              onPressed: () {
-                // Navigate to configuration when tapped.
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ConfigPage()),
-                );
-              },
-            ),
-            new RaisedButton(
-              child: Text('Manual Overide Pill Release'),
-              color: Color.fromRGBO(55, 65, 75, 1),
-              onPressed: null, //TODO SOMETHING, TO ADD FUNCTIONALITY
-            ),
-          ],
+          new RaisedButton(
+            child: Text('Configurations'),
+            onPressed: () {
+              // Navigate to configuration when tapped.
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ConfigPage()),
+              );
+            },
+          ),
+          new RaisedButton(
+            child: Text('Manual Overide Pill Release'),
+            color: Color.fromRGBO(55, 65, 75, 1),
+            onPressed: null, //TODO SOMETHING, TO ADD FUNCTIONALITY
+          ),
+        ],
 
       ),
     );
   }
 }
+
 
 class ConfigPage extends StatelessWidget {
   @override
@@ -87,34 +121,3 @@ class ConfigPage extends StatelessWidget {
   }
 }
 
-
-
-
-
-/* EXAMPLE BELOW IS SIMPLE HELLO WORLD, TO HELP YOU UNDERSTAND HOW STUFF WORKS. UNCOMMENT IT, AND COMMENT MAIN TO SEE
-// Use arrow notation for one-line functions or methods
-void main() => runApp(MyApp());
-
-//The app extends StatelessWidget which makes the app itself a widget. In Flutter, almost everything is a widget, including alignment, padding, and layout.
-class MyApp extends StatelessWidget { //
-  @override
-  //A widget’s main job is to provide a build() method that describes how to display the widget in terms of other, lower level widgets.
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Welcome to Flutter',
-      //The Scaffold widget, from the Material library, provides a default app bar, title, and a body property that holds the widget tree for the home screen.
-      //The widget subtree can be quite complex.
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('Welcome to Flutter'),
-        ),
-        // The body for this example consists of a Center widget containing a Text child widget. The Center widget aligns its widget subtree to the center of the screen.
-        body: Center(
-          child: Text('Hello World'),
-        ),
-      ),
-    );
-  }
-
-}
-*/
