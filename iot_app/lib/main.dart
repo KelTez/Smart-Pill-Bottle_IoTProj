@@ -17,14 +17,16 @@ GLOBALS
 final List<BluetoothDevice> devicesList = new List<BluetoothDevice>();
 final String SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 final String CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+final String UARTdispense = 'p';
+final String UARTlock = 'l';
+final String UARTunlock = 'u';
 BluetoothCharacteristic c; //use this to write
 List<BluetoothService> _services;
-String UARTdispense = 'p';
-String UARTlock = 'l';
-String UARTunlock = 'u';
 int pillsConsumed = 0; //for this one, user manually adds it in
 int manualOverridesDone = 0; //need a way for these numbers to be saved, prolly database. for now, ill ignore that
 int pillsReleased = 0;
+String buttonText = 'Connect';
+bool connected = false;
 
 /*
 MAIN
@@ -57,7 +59,6 @@ class BLEScanPage extends StatefulWidget {
   final String title;
   final String TARGET_DEVICE_NAME = 'PILL_BOTTLE'; //used for check?
   final FlutterBlue flutterBlue = FlutterBlue.instance;
-
   @override
   _BLEPageState createState() => _BLEPageState();
 
@@ -93,10 +94,25 @@ class _BLEPageState extends State<BLEScanPage>{
     });
     widget.flutterBlue.startScan();
   }
-
+  void _changeButtonText() {
+    setState(() {
+      // This call to setState tells the Flutter framework that something has
+      // changed in this State, which causes it to rerun the build method below
+      // so that the display can reflect the updated values. If we changed
+      // _counter without calling setState(), then the build method would not be
+      // called again, and so nothing would appear to happen.
+      buttonText = 'Connected';
+      connected = true;
+    });
+  }
   ListView _buildListViewOfDevices() { //builds listview of devices
     List<Container> containers = new List<Container>();
     for (BluetoothDevice device in devicesList) {
+      if(connected && device.name == widget.TARGET_DEVICE_NAME){
+        buttonText = 'Connected';
+      }else{
+        buttonText = 'Connect';
+      }
       containers.add(
         Container(
           height: 50,
@@ -113,7 +129,7 @@ class _BLEPageState extends State<BLEScanPage>{
               FlatButton(
                 color: Colors.blue,
                 child: Text(
-                  'Connect',
+                  '$buttonText',
                   style: TextStyle(color: Colors.white),
                 ),
                 onPressed: () {
@@ -129,6 +145,7 @@ class _BLEPageState extends State<BLEScanPage>{
                         throw e;
                       }
                     } finally {
+                      _changeButtonText();
                       if(widget.carryOn == 1) {
                         _services = await device.discoverServices();
                           _services.forEach((service) { //double for
@@ -192,9 +209,12 @@ class _BLEPageState extends State<BLEScanPage>{
 
 }
 
+
 /*
 * MAIN PAGE
 */
+
+
 
 class MainPage extends StatefulWidget{
   @override
@@ -204,7 +224,7 @@ class MainPage extends StatefulWidget{
 class _MainPageState extends State<MainPage> { //MIGHT HAVE THIS EXTAND A WIDGET CLASS OR SOMETHINEG
 
   void incrementCounter(int increment) {
-    setState(() {
+    setState(() { //change state of main to have increment a larger value.
       increment++;
     });
   }
@@ -219,14 +239,14 @@ class _MainPageState extends State<MainPage> { //MIGHT HAVE THIS EXTAND A WIDGET
 
         children: <Widget>[
 
-          Titles.adherence, //add the boxes class to main, need to send the data here. to increment with states, to Text('$var')
-          Boxes.consumedBox,
-          Boxes.overrideBox,
-          Boxes.releasedBox,
-          Titles.alarm,
-          Boxes.lastConsumedBox,
-          Boxes.lastReleasedBox,
-          Boxes.alarmBox,
+          Titles(title:'Adherence',hexColor:0xff622f74,size:30.0), //add the boxes class to main, need to send the data here. to increment with states, to Text('$var')
+          DataBoxes(title:'Pills Consumed'),
+          DataBoxes(title:'Pills Released'),
+          DataBoxes(title:'Manual Overrides Done'),
+          Titles(title:'Alarm',hexColor:0xff622f74,size:30.0),
+          DataBoxes(title:'Last Date/Time Consumed Pill'),
+          DataBoxes(title:'Last Date/Time Released Pill'),
+          DataBoxes(title:'Time Until Next Alarm'),
 
           new RaisedButton(
             child: Text('Configurations'),
