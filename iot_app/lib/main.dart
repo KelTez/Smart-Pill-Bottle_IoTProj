@@ -1,6 +1,7 @@
 /*
-* JUST A SIMPLE HELLO_WORLD APP, FOR EASE OF FLUTTER FUNCTIONALITY. TO BUILD OFF OF THIS BASE
+IMPORTS
 */
+import 'dart:convert';
 import 'dart:isolate';
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
@@ -10,6 +11,24 @@ import 'package:android_alarm_manager/android_alarm_manager.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'Widgets.dart';
 
+/*
+GLOBALS
+*/
+final List<BluetoothDevice> devicesList = new List<BluetoothDevice>();
+final String SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+final String CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+BluetoothCharacteristic c; //use this to write
+List<BluetoothService> _services;
+String UARTdispense = 'p';
+String UARTlock = 'l';
+String UARTunlock = 'u';
+int pillsConsumed = 0; //for this one, user manually adds it in
+int manualOverridesDone = 0; //need a way for these numbers to be saved, prolly database. for now, ill ignore that
+int pillsReleased = 0;
+
+/*
+MAIN
+*/
 void main() async {
   int alarmID = 0;
   bool init;
@@ -29,13 +48,15 @@ void testAlarm() {
   print("[$now] Hello, world! isolate=${isolateId} function='$testAlarm'");
 }
 
+/*
+BLE SCAN PAGE
+*/
 class BLEScanPage extends StatefulWidget {
   BLEScanPage({Key key, this.title}) : super(key: key);
   int carryOn = 0; //used to see whether the user can carryOn from bluetooth page
   final String title;
   final String TARGET_DEVICE_NAME = 'PILL_BOTTLE'; //used for check?
   final FlutterBlue flutterBlue = FlutterBlue.instance;
-  final List<BluetoothDevice> devicesList = new List<BluetoothDevice>(); //WONDERING IF WE NEED TO DISPLAY A LIST, IF PHONE CONNECTED TO DEVICE
 
   @override
   _BLEPageState createState() => _BLEPageState();
@@ -46,12 +67,11 @@ class _BLEPageState extends State<BLEScanPage>{
 
   final _writeController = TextEditingController();
   BluetoothDevice _connectedDevice;
-  List<BluetoothService> _services;
 
   _addDeviceTolist(final BluetoothDevice device) {
-    if (!widget.devicesList.contains(device)) {
+    if (!devicesList.contains(device)) {
       setState(() {
-        widget.devicesList.add(device);
+        devicesList.add(device);
       });
     }
   }
@@ -76,7 +96,7 @@ class _BLEPageState extends State<BLEScanPage>{
 
   ListView _buildListViewOfDevices() { //builds listview of devices
     List<Container> containers = new List<Container>();
-    for (BluetoothDevice device in widget.devicesList) {
+    for (BluetoothDevice device in devicesList) {
       containers.add(
         Container(
           height: 50,
@@ -109,7 +129,20 @@ class _BLEPageState extends State<BLEScanPage>{
                         throw e;
                       }
                     } finally {
-                      _services = await device.discoverServices();
+                      if(widget.carryOn == 1) {
+                        _services = await device.discoverServices();
+                          _services.forEach((service) { //double for
+                            if(service.uuid.toString()==SERVICE_UUID){
+                              service.characteristics.forEach((characteristic){
+                                if (characteristic.uuid.toString() == CHARACTERISTIC_UUID){
+                                  c = characteristic;
+                                }
+                              }
+                              );
+                            }
+                          }
+                          );
+                      }
                     }
                     _connectedDevice = device;
                   });
@@ -131,7 +164,7 @@ class _BLEPageState extends State<BLEScanPage>{
             color: Colors.blueAccent,
             child: Text('Main Page', style:TextStyle(color: Colors.white)),
             onPressed: (){
-              if(widget.carryOn == 1){
+              if(widget.carryOn ==  1){ //set to 0 for emulation purposes to test the app
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => MainPage()),
@@ -143,45 +176,14 @@ class _BLEPageState extends State<BLEScanPage>{
         ),
       ],
     );
-  }
-  ListView _buildConnectDeviceView() {
-    List<Container> containers = new List<Container>();
-    for (BluetoothService service in _services) {
-      containers.add(
-        Container(
-          height: 50,
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  children: <Widget>[
-                    Text(service.uuid.toString()),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: <Widget>[
-        ...containers,
-      ],
-    );
   }
-
   ListView _buildView() { //creates connected devices view
-    if (_connectedDevice != null) {
-      return _buildConnectDeviceView();
-    }
     return _buildListViewOfDevices();
   }
 
-@override
- build(BuildContext context) => Scaffold(
+  @override
+  build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(widget.title),
     ),
@@ -194,7 +196,18 @@ class _BLEPageState extends State<BLEScanPage>{
 * MAIN PAGE
 */
 
-class MainPage extends StatelessWidget { //MIGHT HAVE THIS EXTAND A WIDGET CLASS OR SOMETHINEG
+class MainPage extends StatefulWidget{
+  @override
+  _MainPageState createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> { //MIGHT HAVE THIS EXTAND A WIDGET CLASS OR SOMETHINEG
+
+  void incrementCounter(int increment) {
+    setState(() {
+      increment++;
+    });
+  }
 
   Widget build(BuildContext context) {
     return Scaffold(
@@ -206,7 +219,7 @@ class MainPage extends StatelessWidget { //MIGHT HAVE THIS EXTAND A WIDGET CLASS
 
         children: <Widget>[
 
-          Titles.adherence,
+          Titles.adherence, //add the boxes class to main, need to send the data here. to increment with states, to Text('$var')
           Boxes.consumedBox,
           Boxes.overrideBox,
           Boxes.releasedBox,
@@ -226,9 +239,15 @@ class MainPage extends StatelessWidget { //MIGHT HAVE THIS EXTAND A WIDGET CLASS
             },
           ),
           new RaisedButton(
-            child: Text('Manual Overide Pill Release'),
+            child: Text('$manualOverridesDone'), //Manual Override Pill Release
             color: Color.fromRGBO(55, 65, 75, 1),
-            onPressed: null, //TODO SOMETHING, TO ADD FUNCTIONALITY
+            onPressed: (){ //maybe have an alert to ask user if they are sure they want to manually release the pill.
+              //c.write(utf8.encode(UARTunlock));
+              c.write(utf8.encode(UARTdispense));
+              //c.write(utf8.encode(UARTlock));
+              //incrementCounter(manualOverridesDone);
+              //incrementCounter(pillsReleased);
+            },
           ),
         ],
 
