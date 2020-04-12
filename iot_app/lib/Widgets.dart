@@ -42,17 +42,18 @@ class DataBoxes extends StatefulWidget{
   _DataBoxesState createState() => _DataBoxesState();
 }
 
-class _DataBoxesState extends State<DataBoxes>{ //will need work, need to change the backgorund color to match flutter white
+class _DataBoxesState extends State<DataBoxes>{
+
   Widget build(BuildContext context){
     return Stack(
 
       children: <Widget>[
         Container(
           width: 500,
-          height: 100,
+          height: 90,
           child:Center(
             child:Text(
-              'Data To be added here one day...',
+              widget.data.toString(),
               style:TextStyle(fontSize:20.0),
             ),
           ),
@@ -78,9 +79,9 @@ class _DataBoxesState extends State<DataBoxes>{ //will need work, need to change
             )),
       ],
     );
-
   }
 }
+
 
 
 

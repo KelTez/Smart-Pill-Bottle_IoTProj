@@ -20,6 +20,7 @@ final String CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 final String UARTdispense = 'p';
 final String UARTlock = 'l';
 final String UARTunlock = 'u';
+final String TARGET_DEVICE_NAME = 'PILL_BOTTLE';
 BluetoothCharacteristic c; //use this to write
 List<BluetoothService> _services;
 int pillsConsumed = 0; //for this one, user manually adds it in
@@ -57,7 +58,6 @@ class BLEScanPage extends StatefulWidget {
   BLEScanPage({Key key, this.title}) : super(key: key);
   int carryOn = 0; //used to see whether the user can carryOn from bluetooth page
   final String title;
-  final String TARGET_DEVICE_NAME = 'PILL_BOTTLE'; //used for check?
   final FlutterBlue flutterBlue = FlutterBlue.instance;
   @override
   _BLEPageState createState() => _BLEPageState();
@@ -94,21 +94,15 @@ class _BLEPageState extends State<BLEScanPage>{
     });
     widget.flutterBlue.startScan();
   }
-  void _changeButtonText() {
+  void _setConnected() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      buttonText = 'Connected';
-      connected = true;
+      connected = true; //only sets PILL_BOTTLE connection status, for ease. basically hardcoded
     });
   }
   ListView _buildListViewOfDevices() { //builds listview of devices
     List<Container> containers = new List<Container>();
     for (BluetoothDevice device in devicesList) {
-      if(connected && device.name == widget.TARGET_DEVICE_NAME){
+      if(connected && device.name == TARGET_DEVICE_NAME){
         buttonText = 'Connected';
       }else{
         buttonText = 'Connect';
@@ -133,7 +127,7 @@ class _BLEPageState extends State<BLEScanPage>{
                   style: TextStyle(color: Colors.white),
                 ),
                 onPressed: () {
-                  if(device.name == widget.TARGET_DEVICE_NAME){
+                  if(device.name == TARGET_DEVICE_NAME){
                     widget.carryOn = 1;
                   }
                   setState(() async {
@@ -145,7 +139,7 @@ class _BLEPageState extends State<BLEScanPage>{
                         throw e;
                       }
                     } finally {
-                      _changeButtonText();
+                      _setConnected();
                       if(widget.carryOn == 1) {
                         _services = await device.discoverServices();
                           _services.forEach((service) { //double for
@@ -186,7 +180,7 @@ class _BLEPageState extends State<BLEScanPage>{
                   context,
                   MaterialPageRoute(builder: (context) => MainPage()),
                 );
-                return Future.value(false); //to be tested
+                return Future.value(false);
               }
               return Alert(context: context, title: 'Dispenser not connected').show();
             }
@@ -209,23 +203,26 @@ class _BLEPageState extends State<BLEScanPage>{
 
 }
 
-
 /*
 * MAIN PAGE
 */
-
-
 
 class MainPage extends StatefulWidget{
   @override
   _MainPageState createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> { //MIGHT HAVE THIS EXTAND A WIDGET CLASS OR SOMETHINEG
+class _MainPageState extends State<MainPage> {
 
-  void incrementCounter(int increment) {
+  void incrementCounter(String string) {
     setState(() { //change state of main to have increment a larger value.
-      increment++;
+      if(string == 'manualOverridesDone'){
+        manualOverridesDone++;
+      }else if(string == 'pillsConsumed'){
+        pillsConsumed++;
+      }else if(string == 'pillsReleased'){
+        pillsReleased++;
+      }
     });
   }
 
@@ -239,14 +236,56 @@ class _MainPageState extends State<MainPage> { //MIGHT HAVE THIS EXTAND A WIDGET
 
         children: <Widget>[
 
-          Titles(title:'Adherence',hexColor:0xff622f74,size:30.0), //add the boxes class to main, need to send the data here. to increment with states, to Text('$var')
-          DataBoxes(title:'Pills Consumed'),
-          DataBoxes(title:'Pills Released'),
-          DataBoxes(title:'Manual Overrides Done'),
+          Titles(title:'Adherence',hexColor:0xff622f74,size:30.0),
+          DataBoxes(title:'Pills Consumed',data:pillsConsumed),
+          new Container(
+            child:Column(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(0.5),
+                ),
+                new MaterialButton(
+                    color: Colors.blueAccent,
+                    minWidth: 50.0,
+                    child: Text('Increase Pill Consumption', style:TextStyle(color: Colors.white)),
+                    onPressed: (){
+                      if(pillsConsumed + 1 > pillsReleased){
+                        Alert(
+                            context: context,
+                            title: 'WARNING! Consuming more pills than released.',
+                            desc: 'Proceed?',
+                            buttons: [
+                              DialogButton(
+                                child:Text('No.',style:TextStyle(color:Colors.white)),
+                                color: Colors.blueAccent,
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                              DialogButton(
+                                  child:Text('Yes.', style:TextStyle(color:Colors.white)),
+                                  color: Colors.blueAccent,
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    incrementCounter('pillsConsumed');
+                                  }
+                              )
+                            ]
+                        ).show();
+                      }else {
+                        incrementCounter('pillsConsumed');
+                      }
+                    }
+                ),
+              ],
+            ),
+          ),
+
+          DataBoxes(title:'Pills Released',data:pillsReleased),
+          DataBoxes(title:'Manual Overrides Done',data:manualOverridesDone),
           Titles(title:'Alarm',hexColor:0xff622f74,size:30.0),
-          DataBoxes(title:'Last Date/Time Consumed Pill'),
-          DataBoxes(title:'Last Date/Time Released Pill'),
-          DataBoxes(title:'Time Until Next Alarm'),
+          DataBoxes(title:'Last Date/Time Consumed Pill',data:0),
+          DataBoxes(title:'Last Date/Time Released Pill',data:0),
+          DataBoxes(title:'Time Until Next Alarm',data:0),
 
           new RaisedButton(
             child: Text('Configurations'),
@@ -259,14 +298,34 @@ class _MainPageState extends State<MainPage> { //MIGHT HAVE THIS EXTAND A WIDGET
             },
           ),
           new RaisedButton(
-            child: Text('$manualOverridesDone'), //Manual Override Pill Release
+            child: Text('Manual Override Pill Release',style:TextStyle(color:Colors.grey[50])),
             color: Color.fromRGBO(55, 65, 75, 1),
-            onPressed: (){ //maybe have an alert to ask user if they are sure they want to manually release the pill.
-              //c.write(utf8.encode(UARTunlock));
-              c.write(utf8.encode(UARTdispense));
-              //c.write(utf8.encode(UARTlock));
-              //incrementCounter(manualOverridesDone);
-              //incrementCounter(pillsReleased);
+            onPressed: (){
+              return Alert(
+                  context: context,
+                  title: 'Manually release pill before schedule?',
+                  desc: 'Are you sure you want to release a pill?',
+                  buttons: [
+                    DialogButton(
+                      child:Text('No, nevermind.',style:TextStyle(color:Colors.white)),
+                      color: Colors.blueAccent,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    DialogButton(
+                      child:Text('Yes, I am sure!', style:TextStyle(color:Colors.white)),
+                      color: Colors.blueAccent,
+                      onPressed: () {
+                        Navigator.pop(context);
+                        //c.write(utf8.encode(UARTunlock));
+                        c.write(utf8.encode(UARTdispense));
+                        //c.write(utf8.encode(UARTlock));
+                        incrementCounter('manualOverridesDone');
+                        incrementCounter('pillsReleased');
+                      }
+                    )
+                  ]
+              ).show();
+
             },
           ),
         ],
