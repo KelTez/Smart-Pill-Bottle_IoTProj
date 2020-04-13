@@ -14,6 +14,7 @@ import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'Widgets.dart';
+import 'package:intl/intl.dart';
 
 /*
 GLOBALS
@@ -25,14 +26,20 @@ final String UARTdispense = 'p';
 final String UARTlock = 'l';
 final String UARTunlock = 'u';
 final String TARGET_DEVICE_NAME = 'PILL_BOTTLE';
+final dateFormatter = DateFormat('yyyy-MM-dd, H:m');
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-BluetoothCharacteristic c; //use this to write
-List<BluetoothService> _services;
+String buttonText = 'Connect';
+String timeConsumed = 'NO DATA';
+String timeReleased = 'NO DATA';
 int pillsConsumed = 0; //for this one, user manually adds it in
 int manualOverridesDone = 0; //need a way for these numbers to be saved, prolly database. for now, ill ignore that
 int pillsReleased = 0;
-String buttonText = 'Connect';
+int daysLeft = 0;
+int hoursLeft = 0;
+int minutesLeft = 2;
 bool connected = false;
+BluetoothCharacteristic c; //use this to write
+List<BluetoothService> _services;
 Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
 /*
@@ -53,7 +60,7 @@ class IotApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'BLEScanPage',
-      home: BLEScanPage(title: 'Bluetooth Scan'),
+      home: MainPage(),//BLEScanPage(title: 'Bluetooth Scan'),
       // For easy testing on emulator
       //home: MainPage(),
     );
@@ -75,7 +82,6 @@ class BLEScanPage extends StatefulWidget {
 
 class _BLEPageState extends State<BLEScanPage>{
 
-  final _writeController = TextEditingController();
   BluetoothDevice _connectedDevice;
 
   _addDeviceTolist(final BluetoothDevice device) {
@@ -224,6 +230,7 @@ class MainPage extends StatefulWidget{
 class _MainPageState extends State<MainPage> {
   final ConfigMenu config = ConfigMenu();
 
+
   @override
   void initState() {
     super.initState();
@@ -231,6 +238,20 @@ class _MainPageState extends State<MainPage> {
       initAlarms(context);
     });
   }
+
+  void alarmtimes() async{
+    SharedPreferences prefs = await _prefs;
+    setState((){
+      int weeks = prefs.getInt('weeks') ?? 0;
+      int days = prefs.getInt('days') ?? 0;
+      hoursLeft = prefs.getInt('hours') ?? 0;
+      minutesLeft = prefs.getInt('minutes') ?? 0;
+      daysLeft = weeks*7 + days;
+    });
+  }
+  Widget setAlarmTimes(){
+    return TimerBody(days:daysLeft,hours:hoursLeft,minutes:minutesLeft,size:18.0,title:'Time Until Next Alarm');
+  }//weeks*7 + days, hours, minutes)
 
   void incrementCounter(String string) async {
     SharedPreferences prefs = await _prefs;
@@ -249,6 +270,16 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
+  void changeTimeString(String string){
+    setState(() {
+      if(string == 'timeConsumed'){
+        timeConsumed = dateFormatter.format(DateTime.now());
+      }else if(string == 'timeReleased'){
+        timeReleased = dateFormatter.format(DateTime.now());
+      }
+    });
+  }
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -260,7 +291,7 @@ class _MainPageState extends State<MainPage> {
         children: <Widget>[
 
           Titles(title:'Adherence',hexColor:0xff622f74,size:30.0),
-          DataBoxes(title:'Pills Consumed',data:pillsConsumed),
+          DataBoxes(title:'Pills Consumed',data:pillsConsumed.toString()),
           new Container(
             child:Column(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -284,19 +315,23 @@ class _MainPageState extends State<MainPage> {
                                 child:Text('No.',style:TextStyle(color:Colors.white)),
                                 color: Colors.blueAccent,
                                 onPressed: () => Navigator.pop(context),
+
                               ),
                               DialogButton(
                                   child:Text('Yes.', style:TextStyle(color:Colors.white)),
                                   color: Colors.blueAccent,
                                   onPressed: () {
                                     Navigator.pop(context);
+                                    changeTimeString('timeConsumed');
                                     incrementCounter('pillsConsumed');
+
                                   }
                               )
                             ]
                         ).show();
                       }else {
                         incrementCounter('pillsConsumed');
+
                       }
                     }
                 ),
@@ -304,12 +339,12 @@ class _MainPageState extends State<MainPage> {
             ),
           ),
 
-          DataBoxes(title:'Pills Released',data:pillsReleased),
-          DataBoxes(title:'Manual Overrides Done',data:manualOverridesDone),
+          DataBoxes(title:'Pills Released',data:pillsReleased.toString()),
+          DataBoxes(title:'Manual Overrides Done',data:manualOverridesDone.toString()),
           Titles(title:'Alarm',hexColor:0xff622f74,size:30.0),
-          DataBoxes(title:'Last Date/Time Consumed Pill',data:0),
-          DataBoxes(title:'Last Date/Time Released Pill',data:0),
-          DataBoxes(title:'Time Until Next Alarm',data:0),
+          DataBoxes(title:'Last Date/Time Consumed Pill',data:timeConsumed),
+          DataBoxes(title:'Last Date/Time Released Pill',data:timeReleased),
+          setAlarmTimes(),
 
           new RaisedButton(
             child: Text('Configurations'),
@@ -340,6 +375,7 @@ class _MainPageState extends State<MainPage> {
                         //c.write(utf8.encode(UARTunlock));
                         c.write(utf8.encode(UARTdispense));
                         //c.write(utf8.encode(UARTlock));
+                        changeTimeString('timeReleased');
                         incrementCounter('manualOverridesDone');
                         incrementCounter('pillsReleased');
                       }
@@ -360,6 +396,7 @@ class _MainPageState extends State<MainPage> {
 */
 
 class ConfigMenu {
+
   void configMenu(BuildContext context) {
     Alert(
       context: context,
@@ -369,26 +406,31 @@ class ConfigMenu {
           "If this is the first configuration, please press next "
           "to go through each field",
       buttons: [
+        ////////////////////////////////////////////////
         DialogButton(
-          child: Text("Pill Count"),
+          child: Text("Pill Count",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             enterNumPills(context);
           },
         ),
         DialogButton(
-          child: Text("Schedule"),
+          child: Text("Schedule",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             enterPrescriptionSchedule(context);
           },
         ),
         DialogButton(
-          child: Text("Next"),
+          child: Text("Next",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             enterNumPills(context);
           },
         ),
         DialogButton(
-          child: Text("Exit"),
+          child: Text("Exit",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             Navigator.pop(context);
           },
@@ -425,13 +467,15 @@ class ConfigMenu {
       ),
       buttons: [
         DialogButton(
-          child: Text("Menu"),
+          child: Text("Menu",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             Navigator.pop(context);
           },
         ),
         DialogButton(
-          child: Text("Next"),
+          child: Text("Next",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             Navigator.pop(context);
             confirmPillsLoaded(context);
@@ -449,7 +493,8 @@ class ConfigMenu {
       desc: "Please load the bottle with the entered number of pills.",
       buttons: [
         DialogButton(
-          child: Text("Confirm"),
+          child: Text("Confirm",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             Navigator.pop(context);
             enterPrescriptionSchedule(context);
@@ -535,14 +580,16 @@ class ConfigMenu {
       ),
       buttons: [
         DialogButton(
-          child: Text("Back"),
+          child: Text("Back",style:TextStyle(color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             Navigator.pop(context);
             enterNumPills(context);
           },
         ),
         DialogButton(
-          child: Text("Clear Schedule", style: TextStyle(fontSize: 14)),
+          child: Text("Clear Schedule", style: TextStyle(fontSize: 14,color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () {
             int alarmID = 0;
             prefs.setInt('weeks', 0);
@@ -554,7 +601,8 @@ class ConfigMenu {
           },
         ),
         DialogButton(
-          child: Text("Update Schedule", style: TextStyle(fontSize: 14)),
+          child: Text("Update Schedule", style: TextStyle(fontSize: 14,color:Colors.white)),
+          color: Colors.blueAccent,
           onPressed: () async {
             int alarmID = 0;
             int weeks = prefs.getInt('weeks') ?? 0;
@@ -563,11 +611,14 @@ class ConfigMenu {
             int minutes = prefs.getInt('minutes') ?? 0;
             // Cancel previous alarm before creating a new one
             AndroidAlarmManager.cancel(alarmID);
+
+
             if (weeks > 0 || days > 0 || hours > 0 || minutes > 0) {
               await AndroidAlarmManager.periodic(
                   Duration(days: weeks * 7 + days, hours: hours, minutes: minutes),
                   alarmID, AlarmCallback.triggerAlarm, exact: true,
                   wakeup: true, rescheduleOnReboot: true);
+                  //_MainPageState().alarmtimes(weeks*7 + days, hours, minutes);
             }
             Navigator.pop(context);
           },
@@ -576,6 +627,7 @@ class ConfigMenu {
     ).show();
   }
 }
+
 
 /*
 * ALARM CALLBACK CLASS
@@ -615,7 +667,8 @@ class AlarmCallback {
         desc: "It's time to take your pill bud.",
         buttons: [
           DialogButton(
-            child: Text("Dismiss alarm"),
+            child: Text("Dismiss alarm",style: TextStyle(fontSize: 14,color:Colors.white)),
+            color: Colors.blueAccent,
             onPressed: () {
               FlutterRingtonePlayer.stop();
               alertFlag = false;
@@ -631,6 +684,8 @@ class AlarmCallback {
 /*
 * UTILITY ALARM AND NOTIFICATION FUNCTIONS
 */
+
+
 
 void initAlarms(BuildContext context) async {
   var initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
