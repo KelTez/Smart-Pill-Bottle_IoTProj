@@ -12,6 +12,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:android_alarm_manager/android_alarm_manager.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'Widgets.dart';
 
 /*
@@ -32,6 +33,7 @@ int manualOverridesDone = 0; //need a way for these numbers to be saved, prolly 
 int pillsReleased = 0;
 String buttonText = 'Connect';
 bool connected = false;
+Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
 /*
 MAIN
@@ -220,6 +222,8 @@ class MainPage extends StatefulWidget{
 }
 
 class _MainPageState extends State<MainPage> {
+  final ConfigMenu config = ConfigMenu();
+
   @override
   void initState() {
     super.initState();
@@ -228,13 +232,18 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  void incrementCounter(String string) {
+  void incrementCounter(String string) async {
+    SharedPreferences prefs = await _prefs;
     setState(() { //change state of main to have increment a larger value.
       if(string == 'manualOverridesDone'){
         manualOverridesDone++;
       }else if(string == 'pillsConsumed'){
         pillsConsumed++;
       }else if(string == 'pillsReleased'){
+        int numPills = prefs.getInt('num_pills') ?? 0;
+        if (numPills > 0) {
+          prefs.setInt('num_pills', numPills - 1);
+        }
         pillsReleased++;
       }
     });
@@ -305,11 +314,7 @@ class _MainPageState extends State<MainPage> {
           new RaisedButton(
             child: Text('Configurations'),
             onPressed: () {
-              // Navigate to configuration when tapped.
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ConfigPage()),
-              );
+              config.configMenu(context);
             },
           ),
           new RaisedButton(
@@ -318,7 +323,7 @@ class _MainPageState extends State<MainPage> {
             onPressed: (){
               return Alert(
                   context: context,
-                  type: AlertType.warning,
+                  type: AlertType.info,
                   title: 'Manually release pill before schedule?',
                   desc: 'Are you sure you want to release a pill?',
                   buttons: [
@@ -351,20 +356,224 @@ class _MainPageState extends State<MainPage> {
 }
 
 /*
-* CONFIG PAGE
+* CONFIG CLASS
 */
 
-class ConfigPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Configuration"),
+class ConfigMenu {
+  void configMenu(BuildContext context) {
+    Alert(
+      context: context,
+      type: AlertType.info,
+      title: "Configuration Menu",
+      desc: "Please select the option to configure\n"
+          "If this is the first configuration, please press next "
+          "to go through each field",
+      buttons: [
+        DialogButton(
+          child: Text("Pill Count"),
+          onPressed: () {
+            enterNumPills(context);
+          },
+        ),
+        DialogButton(
+          child: Text("Schedule"),
+          onPressed: () {
+            enterPrescriptionSchedule(context);
+          },
+        ),
+        DialogButton(
+          child: Text("Next"),
+          onPressed: () {
+            enterNumPills(context);
+          },
+        ),
+        DialogButton(
+          child: Text("Exit"),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+      ],
+    ).show();
+  }
+
+  void enterNumPills(BuildContext context) async {
+    final SharedPreferences prefs = await _prefs;
+    TextEditingController controller = TextEditingController();
+    controller.text = (prefs.getInt('num_pills') ?? 0).toString();
+    Alert(
+      context: context,
+      type: AlertType.info,
+      title: "Pill count",
+      desc: "Enter the number of pills to be loaded.",
+      content: Column(
+        children: <Widget>[
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Number of pills to store in bottle',
+            ),
+            controller: controller,
+            keyboardType: TextInputType.number,
+            onTap: () {
+              controller.text = "";
+            },
+            onSubmitted: (String value) async {
+              prefs.setInt('num_pills', int.parse(value));
+            },
+          ),
+        ],
       ),
-      body: Center(
-        child: Text('Add config options. Such options include pill dosage, time intervals'),
+      buttons: [
+        DialogButton(
+          child: Text("Menu"),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        DialogButton(
+          child: Text("Next"),
+          onPressed: () {
+            Navigator.pop(context);
+            confirmPillsLoaded(context);
+          },
+        ),
+      ],
+    ).show();
+  }
+
+  void confirmPillsLoaded(BuildContext context) {
+    Alert(
+      context: context,
+      type: AlertType.info,
+      title: "Load bottle",
+      desc: "Please load the bottle with the entered number of pills.",
+      buttons: [
+        DialogButton(
+          child: Text("Confirm"),
+          onPressed: () {
+            Navigator.pop(context);
+            enterPrescriptionSchedule(context);
+          },
+        ),
+      ],
+    ).show();
+  }
+
+  void enterPrescriptionSchedule(BuildContext context) async {
+    final SharedPreferences prefs = await _prefs;
+    TextEditingController weekController = TextEditingController();
+    TextEditingController dayController = TextEditingController();
+    TextEditingController hourController = TextEditingController();
+    TextEditingController minuteController = TextEditingController();
+
+    weekController.text = (prefs.getInt('weeks') ?? 0).toString();
+    dayController.text = (prefs.getInt('days') ?? 0).toString();
+    hourController.text = (prefs.getInt('hours') ?? 0).toString();
+    minuteController.text = (prefs.getInt('minutes') ?? 0).toString();
+
+    Alert(
+      context: context,
+      type: AlertType.info,
+      title: "Schedule",
+      desc: "Enter the amount of time between doses\n"
+          "This should be entered when the first dose of the medication is taken.",
+      content: Column(
+        children: <Widget>[
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Week(s)',
+            ),
+            controller: weekController,
+            keyboardType: TextInputType.number,
+            onTap: () {
+              weekController.text = "";
+            },
+            onSubmitted: (String value) async {
+              prefs.setInt('weeks', int.parse(value));
+            },
+          ),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Day(s)',
+            ),
+            controller: dayController,
+            keyboardType: TextInputType.number,
+            onTap: () {
+              dayController.text = "";
+            },
+            onSubmitted: (String value) async {
+              prefs.setInt('days', int.parse(value));
+            },
+          ),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Hour(s)',
+            ),
+            controller: hourController,
+            keyboardType: TextInputType.number,
+            onTap: () {
+              hourController.text = "";
+            },
+            onSubmitted: (String value) async {
+              prefs.setInt('hours', int.parse(value));
+            },
+          ),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Minute(s)',
+            ),
+            controller: minuteController,
+            keyboardType: TextInputType.number,
+            onTap: () {
+              minuteController.text = "";
+            },
+            onSubmitted: (String value) async {
+              prefs.setInt('minutes', int.parse(value));
+            },
+          ),
+        ],
       ),
-    );
+      buttons: [
+        DialogButton(
+          child: Text("Back"),
+          onPressed: () {
+            Navigator.pop(context);
+            enterNumPills(context);
+          },
+        ),
+        DialogButton(
+          child: Text("Clear Schedule", style: TextStyle(fontSize: 14)),
+          onPressed: () {
+            int alarmID = 0;
+            prefs.setInt('weeks', 0);
+            prefs.setInt('days', 0);
+            prefs.setInt('hours', 0);
+            prefs.setInt('minutes', 0);
+            AndroidAlarmManager.cancel(alarmID);
+            Navigator.pop(context);
+          },
+        ),
+        DialogButton(
+          child: Text("Update Schedule", style: TextStyle(fontSize: 14)),
+          onPressed: () async {
+            int alarmID = 0;
+            int weeks = prefs.getInt('weeks') ?? 0;
+            int days = prefs.getInt('days') ?? 0;
+            int hours = prefs.getInt('hours') ?? 0;
+            int minutes = prefs.getInt('minutes') ?? 0;
+            // Cancel previous alarm before creating a new one
+            AndroidAlarmManager.cancel(alarmID);
+            if (weeks > 0 || days > 0 || hours > 0 || minutes > 0) {
+              await AndroidAlarmManager.periodic(
+                  Duration(days: weeks * 7 + days, hours: hours, minutes: minutes),
+                  alarmID, AlarmCallback.triggerAlarm, exact: true,
+                  wakeup: true, rescheduleOnReboot: true);
+            }
+            Navigator.pop(context);
+          },
+        ),
+      ],
+    ).show();
   }
 }
 
@@ -430,9 +639,7 @@ void initAlarms(BuildContext context) async {
       initializationSettingsAndroid, initializationSettingsIOS);
   flutterLocalNotificationsPlugin.initialize(initializationSettings, onSelectNotification: selectNotification);
   AlarmCallback.setup(context);
-  final int alarmID = 0;
   await AndroidAlarmManager.initialize();
-  await AndroidAlarmManager.periodic(const Duration(minutes: 3), alarmID, AlarmCallback.triggerAlarm);
 }
 
 void showNotification() async {
