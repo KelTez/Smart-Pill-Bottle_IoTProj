@@ -1,13 +1,16 @@
 /*
 IMPORTS
 */
+import 'dart:ui' show IsolateNameServer;
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:android_alarm_manager/android_alarm_manager.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'Widgets.dart';
 
@@ -21,6 +24,7 @@ final String UARTdispense = 'p';
 final String UARTlock = 'l';
 final String UARTunlock = 'u';
 final String TARGET_DEVICE_NAME = 'PILL_BOTTLE';
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 BluetoothCharacteristic c; //use this to write
 List<BluetoothService> _services;
 int pillsConsumed = 0; //for this one, user manually adds it in
@@ -33,22 +37,25 @@ bool connected = false;
 MAIN
 */
 void main() async {
-  int alarmID = 0;
-  bool init;
+  // This line is needed due to what seems to be a bug in the flutter SDK
   WidgetsFlutterBinding.ensureInitialized();
-  //await AndroidAlarmManager.initialize();
-  runApp(MaterialApp(
-    title: 'BLEScanPage',
-    home: BLEScanPage(title: 'Bluetooth Scan'),
-  ));
-  //await AndroidAlarmManager.periodic(const Duration(seconds: 10), alarmID, testAlarm);
+  runApp(IotApp());
 }
 
-//TODO: Add push notification and sound alert when this occurs
-void testAlarm() {
-  final DateTime now = DateTime.now();
-  final int isolateId = Isolate.current.hashCode;
-  print("[$now] Hello, world! isolate=${isolateId} function='$testAlarm'");
+/*
+IOT APP CLASS
+*/
+
+class IotApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BLEScanPage',
+      home: BLEScanPage(title: 'Bluetooth Scan'),
+      // For easy testing on emulator
+      //home: MainPage(),
+    );
+  }
 }
 
 /*
@@ -78,9 +85,7 @@ class _BLEPageState extends State<BLEScanPage>{
   }
 
   @override
-
   void initState() {
-
     super.initState();
     widget.flutterBlue.connectedDevices.asStream().listen((List<BluetoothDevice> devices) {
       for (BluetoothDevice device in devices) { //add connected bluetooth devices to list. later, might to something that checks the name
@@ -94,11 +99,13 @@ class _BLEPageState extends State<BLEScanPage>{
     });
     widget.flutterBlue.startScan();
   }
+
   void _setConnected() {
     setState(() {
       connected = true; //only sets PILL_BOTTLE connection status, for ease. basically hardcoded
     });
   }
+
   ListView _buildListViewOfDevices() { //builds listview of devices
     List<Container> containers = new List<Container>();
     for (BluetoothDevice device in devicesList) {
@@ -213,6 +220,13 @@ class MainPage extends StatefulWidget{
 }
 
 class _MainPageState extends State<MainPage> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration.zero, () {
+      initAlarms(context);
+    });
+  }
 
   void incrementCounter(String string) {
     setState(() { //change state of main to have increment a larger value.
@@ -253,6 +267,7 @@ class _MainPageState extends State<MainPage> {
                       if(pillsConsumed + 1 > pillsReleased){
                         Alert(
                             context: context,
+                            type: AlertType.warning,
                             title: 'WARNING! Consuming more pills than released.',
                             desc: 'Proceed?',
                             buttons: [
@@ -303,6 +318,7 @@ class _MainPageState extends State<MainPage> {
             onPressed: (){
               return Alert(
                   context: context,
+                  type: AlertType.warning,
                   title: 'Manually release pill before schedule?',
                   desc: 'Are you sure you want to release a pill?',
                   buttons: [
@@ -325,7 +341,6 @@ class _MainPageState extends State<MainPage> {
                     )
                   ]
               ).show();
-
             },
           ),
         ],
@@ -334,6 +349,10 @@ class _MainPageState extends State<MainPage> {
     );
   }
 }
+
+/*
+* CONFIG PAGE
+*/
 
 class ConfigPage extends StatelessWidget {
   @override
@@ -347,4 +366,88 @@ class ConfigPage extends StatelessWidget {
       ),
     );
   }
+}
+
+/*
+* ALARM CALLBACK CLASS
+*/
+
+class AlarmCallback {
+  static final ReceivePort _uiport = ReceivePort();
+  static BuildContext context;
+  static bool alertFlag = false;
+
+  static void setup(BuildContext buildContext) {
+    IsolateNameServer.registerPortWithName(_uiport.sendPort, 'alarm');
+    context = buildContext;
+    _uiport.listen((alarmOn) {
+      print("Callback reached");
+      if (alarmOn) {
+        FlutterRingtonePlayer.playAlarm();
+        alarmAlert();
+      }
+    });
+  }
+
+  static Future<void> triggerAlarm() async {
+    print("Start send");
+    showNotification();
+    SendPort uiPort = IsolateNameServer.lookupPortByName('alarm');
+    uiPort.send(true);
+  }
+
+  static void alarmAlert() {
+    if (!alertFlag) {
+      alertFlag = true;
+      Alert(
+        context: context,
+        type: AlertType.info,
+        title: "Scheduled Dose Alert",
+        desc: "It's time to take your pill bud.",
+        buttons: [
+          DialogButton(
+            child: Text("Dismiss alarm"),
+            onPressed: () {
+              FlutterRingtonePlayer.stop();
+              alertFlag = false;
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ).show();
+    }
+  }
+}
+
+/*
+* UTILITY ALARM AND NOTIFICATION FUNCTIONS
+*/
+
+void initAlarms(BuildContext context) async {
+  var initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  var initializationSettingsIOS = IOSInitializationSettings();
+  var initializationSettings = InitializationSettings(
+      initializationSettingsAndroid, initializationSettingsIOS);
+  flutterLocalNotificationsPlugin.initialize(initializationSettings, onSelectNotification: selectNotification);
+  AlarmCallback.setup(context);
+  final int alarmID = 0;
+  await AndroidAlarmManager.initialize();
+  await AndroidAlarmManager.periodic(const Duration(minutes: 3), alarmID, AlarmCallback.triggerAlarm);
+}
+
+void showNotification() async {
+  var androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      'your channel id', 'your channel name', 'your channel description',
+      importance: Importance.Max, priority: Priority.High, ticker: 'ticker');
+  var iOSPlatformChannelSpecifics = IOSNotificationDetails();
+  var platformChannelSpecifics = NotificationDetails(
+      androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+  await flutterLocalNotificationsPlugin.show(
+      0, 'Time to take your dose', 'Please tap to dismiss the alarm', platformChannelSpecifics,
+      payload: 'item x');
+}
+
+Future selectNotification(String payload) async {
+  FlutterRingtonePlayer.stop();
+  print('Notification selected');
 }
