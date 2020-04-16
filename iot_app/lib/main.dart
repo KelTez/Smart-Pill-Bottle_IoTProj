@@ -646,6 +646,7 @@ class AlarmCallback {
       if (alarmOn) {
         FlutterRingtonePlayer.playAlarm();
         alarmAlert();
+        c.write(utf8.encode(UARTunlock));
       }
     });
   }
